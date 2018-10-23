@@ -22,6 +22,10 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
     @IBOutlet var appDisplayName: NSTextField!
     @IBOutlet var appShortVersion: NSTextField!
     @IBOutlet var appVersion: NSTextField!
+    @IBOutlet var collectionCheckBoxButton: NSButton!
+    @IBOutlet var collectionTextField: NSTextField!
+    @IBOutlet var agentKeyTextField: NSTextField!
+    @IBOutlet var iconPrefixNameTextField: NSTextField!
     
     //MARK: Variables
     var provisioningProfiles:[ProvisioningProfile] = []
@@ -555,7 +559,34 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
         }
     }
     
-    func signingThread(){
+    func signingThread() {
+        var isSingle = true
+        DispatchQueue.main.sync {
+            isSingle = self.collectionCheckBoxButton.state != NSControlStateValueOn
+        }
+        if isSingle {
+            signingThread2()
+        } else {
+            var collectionString = ""
+            DispatchQueue.main.sync {
+                collectionString = self.collectionTextField.stringValue
+            }
+            if collectionString != "" {
+                let items = collectionString.components(separatedBy: ";")
+                for item in items {
+                    let elements = item.components(separatedBy: ",")
+                    if let outputFile = self.outputFile {
+                        let outputPath = outputFile.stringByDeletingLastPathComponent
+                        let pathExtension = (outputFile as NSString).pathExtension
+                        self.outputFile = outputPath + "/\(elements[0])." + pathExtension
+                    }
+                    signingThread2(aDisplayName: elements[0], aAgentValue: elements[1], aIconFolderName: elements[2])
+                }
+            }
+        }
+    }
+    
+    func signingThread2 (aDisplayName: String? = nil, aAgentValue: String? = nil, aIconFolderName: String? = nil){
         
         
         //MARK: Set up variables
@@ -566,14 +597,18 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
         var newDisplayName : String = ""
         var newShortVersion : String = ""
         var newVersion : String = ""
+        var agentKey: String = ""
+        var iconPrefixName: String = ""
 
         DispatchQueue.main.sync {
             inputFile = self.InputFileText.stringValue
             signingCertificate = self.CodesigningCertsPopup.selectedItem?.title
             newApplicationID = self.NewApplicationIDTextField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-            newDisplayName = self.appDisplayName.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            newDisplayName = aDisplayName ?? self.appDisplayName.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             newShortVersion = self.appShortVersion.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             newVersion = self.appVersion.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            agentKey = self.agentKeyTextField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            iconPrefixName = self.iconPrefixNameTextField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         }
 
         var provisioningFile = self.profileFilename
@@ -945,6 +980,79 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                     }
                 }
                 
+                //MARK: 添加渠道号
+                if agentKey != "", let agentValue = aAgentValue, agentValue.count > 0 {
+                    setStatus("Changing Agent to \(agentValue)")
+                    let agentChangeTask = Process().execute(defaultsPath, workingDirectory: nil, arguments: ["write",appBundleInfoPlist,agentKey, agentValue])
+                    if agentChangeTask.status != 0 {
+                        setStatus("Error changing agent")
+                        Log.write(agentChangeTask.output)
+                        cleanup(tempFolder); return
+                    }
+                }
+                
+                //MARK: 替换图标
+                if let iconFolderName = aIconFolderName {
+                    // 删除CFBundleIconName是为了优先引用AppBundle下的图标，否则会引用Assets.car下的图标，替换Assets.car下的图标暂时还没有办法
+                    let dic = NSMutableDictionary(contentsOfFile: appBundleInfoPlist)
+                    (((dic?["CFBundleIcons"] as? NSMutableDictionary)?["CFBundlePrimaryIcon"]) as? NSMutableDictionary)?["CFBundleIconName"] = nil
+                    
+                    // 删除Info.plist
+                    if fileManager.fileExists(atPath: appBundleInfoPlist) {
+                        setStatus("Deleting Info Plist")
+                        do {
+                            try fileManager.removeItem(atPath: appBundleInfoPlist)
+                        } catch let error as NSError {
+                            setStatus("Error deleting Info Plist")
+                            Log.write(error.localizedDescription)
+                            cleanup(tempFolder); return
+                        }
+                    }
+                    
+                    // 写入Info.plist
+                    dic?.write(toFile: appBundleInfoPlist, atomically: true)
+                
+                    let iconNames = [
+                        "\(iconPrefixName)20x20@2x.png",
+                        "\(iconPrefixName)20x20@3x.png",
+                        "\(iconPrefixName)29x29@2x.png",
+                        "\(iconPrefixName)29x29@3x.png",
+                        "\(iconPrefixName)40x40@2x.png",
+                        "\(iconPrefixName)40x40@3x.png",
+                        "\(iconPrefixName)60x60@2x.png",
+                        "\(iconPrefixName)60x60@3x.png"
+                    ]
+                    
+                    // 删除原有图标
+                    for iconName in iconNames {
+                        let path = appBundlePath.stringByAppendingPathComponent(iconName)
+                        if fileManager.fileExists(atPath: path) {
+                            setStatus("Deleting \(iconName)")
+                            do {
+                                try fileManager.removeItem(atPath: path)
+                            } catch let error as NSError {
+                                setStatus("Error deleting \(iconName)")
+                                Log.write(error.localizedDescription)
+                                cleanup(tempFolder); return
+                            }
+                        }
+                    }
+                    
+                    setStatus("Copying icons to app bundle")
+                    
+                    // 复制替换图标
+                    for iconName in iconNames {
+                        let atPath = inputFile.stringByDeletingLastPathComponent + "/\(iconFolderName)/" + iconName
+                        let toPath = appBundlePath.stringByAppendingPathComponent(iconName)
+                        do {
+                            try fileManager.copyItem(atPath: atPath, toPath: toPath)
+                        } catch let error as NSError {
+                            setStatus("Error copying \(iconName)")
+                            Log.write(error.localizedDescription)
+                            cleanup(tempFolder); return
+                        }
+                    }
+                }
                 
                 func generateFileSignFunc(_ payloadDirectory:String, entitlementsPath: String, signingCertificate: String)->((_ file:String)->Void){
                     
