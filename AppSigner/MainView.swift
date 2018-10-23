@@ -344,6 +344,10 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 NewApplicationIDTextField.stringValue = PreviousNewApplicationID
                 StartButton.isEnabled = true
                 appDisplayName.isEnabled = true
+                collectionCheckBoxButton.isEnabled = true
+                collectionTextField.isEnabled = true
+                agentKeyTextField.isEnabled = true
+                iconPrefixNameTextField.isEnabled = true
             } else {
                 // Backup previous values
                 PreviousNewApplicationID = NewApplicationIDTextField.stringValue
@@ -356,6 +360,10 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 NewApplicationIDTextField.isEnabled = false
                 StartButton.isEnabled = false
                 appDisplayName.isEnabled = false
+                collectionCheckBoxButton.isEnabled = false
+                collectionTextField.isEnabled = false
+                agentKeyTextField.isEnabled = false
+                iconPrefixNameTextField.isEnabled = false
             }
         }
     }
@@ -580,6 +588,7 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                         let pathExtension = (outputFile as NSString).pathExtension
                         self.outputFile = outputPath + "/\(elements[0])." + pathExtension
                     }
+                    controlsEnabled(false)
                     signingThread2(aDisplayName: elements[0], aAgentValue: elements[1], aIconFolderName: elements[2])
                 }
             }
