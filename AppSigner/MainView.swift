@@ -378,7 +378,7 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 if isDirectory.boolValue {
                     recursiveMachOSearch(currentFile, found: found)
                 }
-                if checkMachOFile(path) {
+                if checkMachOFile(currentFile) {
                     found(currentFile)
                 }
             }
