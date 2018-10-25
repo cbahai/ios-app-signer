@@ -1001,7 +1001,7 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 }
                 
                 //MARK: 替换图标
-                if let iconFolderName = aIconFolderName {
+                if iconPrefixName != "", let iconFolderName = aIconFolderName, iconFolderName.count > 0 {
                     // 删除CFBundleIconName是为了优先引用AppBundle下的图标，否则会引用Assets.car下的图标，替换Assets.car下的图标暂时还没有办法
                     let dic = NSMutableDictionary(contentsOfFile: appBundleInfoPlist)
                     (((dic?["CFBundleIcons"] as? NSMutableDictionary)?["CFBundlePrimaryIcon"]) as? NSMutableDictionary)?["CFBundleIconName"] = nil
