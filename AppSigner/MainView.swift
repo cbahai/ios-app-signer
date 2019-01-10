@@ -575,6 +575,10 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
         if isSingle {
             signingThread2()
         } else {
+            guard let multiOutputPath = self.outputFile?.stringByDeletingLastPathComponent, let fileName = self.outputFile?.lastPathComponent else {
+                return
+            }
+            
             var collectionString = ""
             DispatchQueue.main.sync {
                 collectionString = self.collectionTextField.stringValue
@@ -583,11 +587,7 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 let items = collectionString.components(separatedBy: ";")
                 for item in items {
                     let elements = item.components(separatedBy: ",")
-                    if let outputFile = self.outputFile {
-                        let outputPath = outputFile.stringByDeletingLastPathComponent
-                        let pathExtension = (outputFile as NSString).pathExtension
-                        self.outputFile = outputPath + "/\(elements[0])." + pathExtension
-                    }
+                    self.outputFile = multiOutputPath + "/\(elements[1])/" + fileName
                     controlsEnabled(false)
                     signingThread2(aDisplayName: elements[0], aAgentValue: elements[1], aIconFolderName: elements[2])
                 }
