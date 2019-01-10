@@ -587,7 +587,17 @@ class MainView: NSView, URLSessionDataDelegate, URLSessionDelegate, URLSessionDo
                 let items = collectionString.components(separatedBy: ";")
                 for item in items {
                     let elements = item.components(separatedBy: ",")
-                    self.outputFile = multiOutputPath + "/\(elements[1])/" + fileName
+                    let path = multiOutputPath + "/\(elements[1])/"
+                    
+                    do {
+                        try fileManager.createDirectory(atPath: path, withIntermediateDirectories: true, attributes: nil)
+                    } catch let error as NSError {
+                        setStatus("创建包目录失败")
+                        Log.write(error.localizedDescription)
+                        return
+                    }
+                    
+                    self.outputFile = path + fileName
                     controlsEnabled(false)
                     signingThread2(aDisplayName: elements[0], aAgentValue: elements[1], aIconFolderName: elements[2])
                 }
